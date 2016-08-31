@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8">
+		<title>D3: Force layout</title>
+		<style type="text/css">
+
+
+
+				.links line {
+				  stroke: #999;
+				  stroke-opacity: 0.6;
+				}
+
+				.nodes circle {
+				  stroke: #fff;
+				  stroke-width: 1.5px;
+				}
+
+
+
+		</style>
+	</head>
+	<body>
+
+		<svg width="960" height="800"></svg>
+		<script src="https://d3js.org/d3-collection.v1.min.js"></script>
+<script src="https://d3js.org/d3-dispatch.v1.min.js"></script>
+<script src="https://d3js.org/d3-quadtree.v1.min.js"></script>
+<script src="https://d3js.org/d3-timer.v1.min.js"></script>
+<script src="https://d3js.org/d3-force.v1.min.js"></script>
+		<script src="https://d3js.org/d3.v4.min.js"></script>
+    <link href="tipsy.css" rel="stylesheet" type="text/css" />
+
+		<script>
+
+		var svg = d3.select("svg"),
+		    width = +svg.attr("width"),
+		    height = +svg.attr("height");
+
+		var color = d3.scaleOrdinal(d3.schemeCategory20);
+
+		var simulation = d3.forceSimulation()
+		    .force("link", d3.forceLink().id(function(d) { return d.name; }))
+				.force("distance", d3.forceLink())//?
+		    .force("charge", d3.forceManyBody())
+				.force("strength", d3.forceManyBody(-10000))
+				.force("distanceMin", d3.forceManyBody(1000000))
+				.force("radius",d3.forceCollide(50))//
+				.force("strength",d3.forceCollide(0.7))//?
+		    .force("center", d3.forceCenter(width / 2, height / 2));
+
+
+		d3.json("templates_force.json", function(error, graph) {
+		  if (error) throw error;
+
+			graphRec=JSON.parse(JSON.stringify(graph)); //Add this line
+
+
+		  var link = svg.append("g")
+		      .attr("class", "links")
+		    .selectAll("line")
+		    .data(graph.links)
+		    .enter().append("line")
+		      .attr("stroke-width", function(d) { return Math.max(0.5,d.value/150000); })
+					.style("marker-end",  "url(#suit)") // Modified line for Add ARROWS
+;
+
+		  var node = svg.append("g")
+		      .attr("class", "nodes")
+		    .selectAll("circle")
+		    .data(graph.nodes)
+		    .enter().append("circle")
+		      .attr("r", function(d) {return Math.max(4,d.occurrences/8000)})
+		      .attr("fill", function(d) { return color(d.occurrences); }) //
+		      .call(d3.drag()
+		          .on("start", dragstarted)
+		          .on("drag", dragged)
+		          .on("end", dragended))
+						.on('dblclick', connectedNodes); //Added code for "double click to hide non connected nodes"
+
+		  node.append("title")
+		  .text(function(d) { return 'Template ' + d.name + " : " + d.words +". Appeared " + d.occurrences + " times."; });
+
+		  simulation
+		      .nodes(graph.nodes)
+		      .on("tick", ticked);
+
+		  simulation.force("link")
+		      .links(graph.links);
+
+		  function ticked() {
+		    link
+		        .attr("x1", function(d) { return d.source.x; })
+		        .attr("y1", function(d) { return d.source.y; })
+		        .attr("x2", function(d) { return d.target.x; })
+		        .attr("y2", function(d) { return d.target.y; });
+
+		    node
+		        .attr("cx", function(d) { return d.x; })
+		        .attr("cy", function(d) { return d.y; });
+		  }
+		  /*----------------------------------------------------------------------*/
+
+			/*----------------------------------------------------------------------*/
+			// DOUBLE CLICK TO HIDE NON CONNECTED NODES (also add: .on('dblclick', connectedNodes) to NODES)
+			//Toggle stores whether the highlighting is on
+			var toggle = 0;
+			//Create an array logging what is connected to what
+			var linkedByIndex = {};
+			for (i = 0; i < graph.nodes.length; i++) {
+			    linkedByIndex[i + "," + i] = 1;
+			};
+			graph.links.forEach(function (d) {
+			    linkedByIndex[d.source.index + "," + d.target.index] = 1;
+			});
+			//This function looks up whether a pair are neighbours
+			function neighboring(a, b) {
+			    return linkedByIndex[a.index + "," + b.index];
+			}
+			function connectedNodes() {
+			    if (toggle == 0) {
+			        //Reduce the opacity of all but the neighbouring nodes
+			        d = d3.select(this).node().__data__;
+			        node.style("opacity", function (o) {
+			            return neighboring(d, o) | neighboring(o, d) ? 1 : 0.1;
+			        });
+			        link.style("opacity", function (o) {
+			            return d.index==o.source.index | d.index==o.target.index ? 1 : 0.1;
+			        });
+			        //Reduce the op
+			        toggle = 1;
+			    } else {
+			        //Put them back to opacity=1
+			        node.style("opacity", 1);
+			        link.style("opacity", 1);
+			        toggle = 0;
+			    }
+			}
+			/*----------------------------------------------------------------------*/
+			// ADD ARROWS (also add .style("marker-end",  "url(#suit)") in link properties)
+			svg.append("defs").selectAll("marker")
+    .data(["suit", "licensing", "resolved"])
+  .enter().append("marker")
+    .attr("id", function(d) { return d; })
+    .attr("viewBox", "0 -5 10 10")
+    .attr("refX", 15)
+    .attr("refY", 0)
+    .attr("markerWidth", 6)
+    .attr("markerHeight", 6)
+    .attr("orient", "auto")
+  .append("path")
+    .attr("d", "M0,-5L10,0L0,5 L10,0 L0, -5")
+    .style("stroke", "#4679BD")
+    .style("opacity", "0.35");
+
+
+		}); //end data function
+/*---------------------------------------------------------------------------------------------------------------*/
+		function dragstarted(d) {
+		  if (!d3.event.active) simulation.alphaTarget(0.3).restart();
+		  d.fx = d.x;
+		  d.fy = d.y;
+		}
+
+		function dragged(d) {
+		  d.fx = d3.event.x;
+		  d.fy = d3.event.y;
+		}
+
+		function dragended(d) {
+		  if (!d3.event.active) simulation.alphaTarget(0);
+		  d.fx = null;
+		  d.fy = null;
+		}
+
+
+
+	//	</script>
+
+
+		</script>
+	</body>
+</html>

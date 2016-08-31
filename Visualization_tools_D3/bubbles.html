@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <script type="text/javascript" src="http://mbostock.github.com/d3/d3.js"></script>
+    <script type="text/javascript" src="http://code.jquery.com/jquery-1.6.2.min.js"></script>
+    <script type="text/javascript" src="jquery.tipsy.js"></script>
+    <link href="tipsy.css" rel="stylesheet" type="text/css" />
+  </head>
+  <body>
+    <div id="chart"></div>
+    <script type="text/javascript">
+
+      var w = 800, h = 500;
+      var colors = d3.scale.category20();
+
+      var vis = d3.select("#chart").append("svg:svg")
+          .attr("width", w)
+          .attr("height", h);
+
+      var data = d3.range(20).map(function(i) {
+        return { i:i, x:Math.random()*w, y:Math.random()*h, r:Math.random()*30 }
+      });
+
+      vis.selectAll("circle")
+         .data(data)
+       .enter().append("svg:circle")
+         .attr("stroke", "black")
+         .attr("fill", function(d, i) { return colors(i); })
+         .attr("cx", function(d, i) { return d.x; })
+         .attr("cy", function(d, i) { return d.y; })
+         .attr("r", function(d, i) { return d.r; });
+
+      $('svg circle').tipsy({
+        gravity: 'w',
+        html: true,
+        title: function() {
+          var d = this.__data__, c = colors(d.i);
+          return 'Hi there! My color is <span style="color:' + c + '">' + c + '</span>';
+        }
+      });
+
+    </script>
+
+  </body>
+</html>
